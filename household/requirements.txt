@@ -1,0 +1,17 @@
+# Core ML framework — TF 2.18+ works natively on Apple Silicon (M1/M2/M3)
+tensorflow>=2.18,<2.21
+
+# NOTE: tensorflow-metal (GPU acceleration) is NOT compatible with TF 2.20 yet.
+# TF will run on CPU. Training still works, just slower than with Metal GPU.
+# Uncomment below when Apple releases a compatible version:
+# tensorflow-metal>=1.2.0
+
+# Numerical & data
+numpy>=1.26,<2.3
+matplotlib>=3.8
+
+# Metrics (classification_report, confusion_matrix, class weights)
+scikit-learn>=1.4
+
+# Image loading (used by Keras preprocessing)
+pillow>=10.0
