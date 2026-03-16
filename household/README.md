@@ -1,1 +1,1 @@
-house hold dataset model
+household dataset model
