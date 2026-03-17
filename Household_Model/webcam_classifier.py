@@ -67,35 +67,35 @@ if os.path.exists(CLASSES_PATH):
 WASTE_INFO = {
     "E-waste": (
         "E-Waste Bin", (60, 60, 220), False,
-        "Take to e-waste collection center. Remove batteries first."
+        "Scanning e-waste... Safe disposal required. Please place in dedicated e-waste compartment."
     ),
     "battery waste": (
         "Hazardous Bin", (0, 130, 255), False,
-        "HAZARDOUS — Never throw in regular trash. Drop at collection point."
+        "Hazard detected! Routing to fire-safe battery collection zone."
     ),
     "glass waste": (
         "Recyclable Bin", (0, 200, 100), True,
-        "RECYCLABLE — Rinse clean. Remove caps/lids before recycling."
+        "Glass identified. Sorting into delicate recyclables chamber."
     ),
     "light bulbs": (
         "Hazardous Bin", (0, 130, 255), False,
-        "HAZARDOUS — Do not break. Take to special waste facility."
+        "Fragile hazardous item. Slowly lowering into protected bulb separator."
     ),
     "metal waste": (
         "Recyclable Bin", (0, 200, 100), True,
-        "RECYCLABLE — Crush cans to save space. Rinse food containers."
+        "Metal detected. Magnetically routing to crush & recycle hopper."
     ),
     "organic waste": (
         "Organic / Wet Bin", (50, 130, 180), False,
-        "COMPOSTABLE — Can be composted. Keep separate from dry waste."
+        "Organic matter detected. Depositing into active compost section."
     ),
     "paper waste": (
         "Paper Bin", (220, 160, 50), True,
-        "RECYCLABLE — Keep dry. Remove any plastic coating or tape."
+        "Paper identified. Checking for moisture... Routing to dry paper bin."
     ),
     "plastic waste": (
         "Plastic Bin", (0, 220, 255), True,
-        "RECYCLABLE — Check resin code. Rinse containers before recycling."
+        "Plastic scanned. Sorting into main plastics recycling stream."
     ),
 }
 
@@ -185,34 +185,33 @@ def preprocess_zone(frame, x1, y1, x2, y2):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Animated Scan Zone
+# Animated Scan Zone (Modern / Futuristic)
 # ──────────────────────────────────────────────────────────────────────────────
 def draw_scan_zone_animated(frame, x1, y1, x2, y2, color, t):
     """
-    Draw a scan zone with:
-      - Pulsing corner brackets (breathing effect)
-      - A horizontal scan line sweeping up and down
-    t = current time in seconds (used for animation phase)
+    Draw a high-tech scan zone with:
+      - Sharp corner brackets
+      - A digital crosshair in the center
+      - A scanning laser line with a trailing grid effect
+      - Flowing "data stream" lines 
     """
     w = x2 - x1
     h = y2 - y1
+    cx = x1 + w // 2
+    cy = y1 + h // 2
 
-    # ── Breathing corners ────────────────────────────────────────────────
-    # Corner length oscillates between 20 and 40
-    pulse = math.sin(t * 3.0) * 0.5 + 0.5          # 0..1 pulsing
-    corner_len = int(20 + pulse * 20)
+    # ── Corner Brackets ──────────────────────────────────────────────────
+    # Sharp, fast pulsing corner brackets
+    pulse = (math.sin(t * 6.0) * 0.5 + 0.5) ** 2         
+    corner_len = int(30 + pulse * 10)
     corner_len = min(corner_len, w // 4, h // 4)
+    
+    # Outer frame
+    cv2.rectangle(frame, (x1, y1), (x2, y2), tuple(int(c * 0.3) for c in color), 1)
 
-    # Corner opacity also pulses slightly
-    alpha = 0.6 + pulse * 0.4  # 0.6..1.0
+    ct = 2  # thin, sharp corners
+    bright = tuple(min(255, int(c * (0.8 + pulse * 0.5))) for c in color)
 
-    # Blend a brighter version of the color for the pulse
-    bright = tuple(min(255, int(c * (0.7 + pulse * 0.5))) for c in color)
-
-    # Thin full rectangle (always subtle)
-    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)
-
-    ct = 3  # corner thickness
     # Top-left
     cv2.line(frame, (x1, y1), (x1 + corner_len, y1), bright, ct)
     cv2.line(frame, (x1, y1), (x1, y1 + corner_len), bright, ct)
@@ -226,27 +225,64 @@ def draw_scan_zone_animated(frame, x1, y1, x2, y2, color, t):
     cv2.line(frame, (x2, y2), (x2 - corner_len, y2), bright, ct)
     cv2.line(frame, (x2, y2), (x2, y2 - corner_len), bright, ct)
 
-    # ── Scanning line (sweeps up and down) ───────────────────────────────
-    scan_phase = (math.sin(t * 2.0) * 0.5 + 0.5)   # 0..1 bounce
-    scan_y = int(y1 + scan_phase * h)
+    # ── Center Tracking Crosshair ────────────────────────────────────────
+    cross_size = 15
+    cv2.line(frame, (cx - cross_size, cy), (cx - 5, cy), bright, 1)
+    cv2.line(frame, (cx + 5, cy), (cx + cross_size, cy), bright, 1)
+    cv2.line(frame, (cx, cy - cross_size), (cx, cy - 5), bright, 1)
+    cv2.line(frame, (cx, cy + 5), (cx, cy + cross_size), bright, 1)
+    cv2.circle(frame, (cx, cy), 2, bright, -1)
+
+    # ── Edge Data Marks ──────────────────────────────────────────────────
+    # Simulates measuring tapes along the edges
+    for i in range(1, 4):
+        mark_y = y1 + int(h * i / 4)
+        cv2.line(frame, (x1, mark_y), (x1 + 8, mark_y), color, 1)
+        cv2.line(frame, (x2, mark_y), (x2 - 8, mark_y), color, 1)
+        
+        mark_x = x1 + int(w * i / 4)
+        cv2.line(frame, (mark_x, y1), (mark_x, y1 + 8), color, 1)
+        cv2.line(frame, (mark_x, y2), (mark_x, y2 - 8), color, 1)
+
+    # ── Fast Sweeping Laser ──────────────────────────────────────────────
+    scan_t = (t * 1.5) % 2.0  # 0 to 2
+    if scan_t > 1.0:
+        scan_t = 2.0 - scan_t  # back and forth 0..1..0
+        
+    scan_y = int(y1 + scan_t * h)
     scan_y = max(y1 + 2, min(scan_y, y2 - 2))
 
-    # Draw a semi-transparent horizontal line with gradient fade
     overlay = frame.copy()
-    cv2.line(overlay, (x1 + 5, scan_y), (x2 - 5, scan_y), color, 2)
+    
+    # Intensely glowing laser line
+    cv2.line(overlay, (x1 + 2, scan_y), (x2 - 2, scan_y), (255, 255, 255), 1)
+    cv2.line(overlay, (x1 + 2, scan_y), (x2 - 2, scan_y), bright, 3)
 
-    # Small glow around the scan line
-    for offset in range(1, 8):
-        fade = max(0, 255 - offset * 40)
+    # Trailing scanning grid / wash behind the laser
+    direction = 1 if (t * 1.5) % 2.0 < 1.0 else -1
+    wash_height = 40
+    for offset in range(1, wash_height, 2):
+        fade = max(0, 255 - int((offset / wash_height) * 255))
         fade_color = tuple(int(c * fade / 255) for c in color)
-        if y1 < scan_y - offset < y2:
-            cv2.line(overlay, (x1 + 5, scan_y - offset),
-                     (x2 - 5, scan_y - offset), fade_color, 1)
-        if y1 < scan_y + offset < y2:
-            cv2.line(overlay, (x1 + 5, scan_y + offset),
-                     (x2 - 5, scan_y + offset), fade_color, 1)
+        
+        trail_y = scan_y - (offset * direction)
+        if y1 < trail_y < y2:
+            # Draw dashed lines for the data grid effect
+            if offset % 6 == 1:
+                for grid_x in range(x1 + 10, x2 - 10, 20):
+                    cv2.line(overlay, (grid_x, trail_y), (grid_x + 10, trail_y), fade_color, 1)
+            else:
+                cv2.line(overlay, (x1 + 2, trail_y), (x2 - 2, trail_y), fade_color, 1)
 
-    cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+    cv2.addWeighted(overlay, 0.4, frame, 0.6, 0, frame)
+    
+    # ── Random Matrix-like Data Stream text inside box ──────────────────
+    if (t * 10) % 1.0 < 0.2: # Update sporadically
+        stream_x = x1 + 15
+        stream_y = y1 + 25 + int(pulse * 10)
+        num1 = str(np.random.randint(1000, 9999))
+        num2 = str(np.random.randint(10, 99))
+        cv2.putText(frame, f"REC:{num1} X:{num2}", (stream_x, stream_y), cv2.FONT_HERSHEY_PLAIN, 0.7, color, 1)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
