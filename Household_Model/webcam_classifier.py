@@ -250,6 +250,37 @@ def draw_scan_zone_animated(frame, x1, y1, x2, y2, color, t):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# UI Helpers
+# ──────────────────────────────────────────────────────────────────────────────
+def draw_text_with_shadow(img, text, position, font, scale, color, thickness=1, shadow_color=(0,0,0), shadow_offset=(2,2)):
+    """Draws text with a subtle drop shadow for better readability."""
+    x, y = position
+    sx, sy = shadow_offset
+    cv2.putText(img, text, (x + sx, y + sy), font, scale, shadow_color, thickness + 1, cv2.LINE_AA)
+    cv2.putText(img, text, position, font, scale, color, thickness, cv2.LINE_AA)
+
+def draw_rounded_rect(img, top_left, bottom_right, color, thickness=1, radius=10, fill=False):
+    """Draws a rectangle with rounded corners."""
+    x1, y1 = top_left
+    x2, y2 = bottom_right
+
+    # Draw corners
+    cv2.ellipse(img, (x1 + radius, y1 + radius), (radius, radius), 180, 0, 90, color, thickness, cv2.LINE_AA)
+    cv2.ellipse(img, (x2 - radius, y1 + radius), (radius, radius), 270, 0, 90, color, thickness, cv2.LINE_AA)
+    cv2.ellipse(img, (x1 + radius, y2 - radius), (radius, radius), 90, 0, 90, color, thickness, cv2.LINE_AA)
+    cv2.ellipse(img, (x2 - radius, y2 - radius), (radius, radius), 0, 0, 90, color, thickness, cv2.LINE_AA)
+
+    if fill:
+        cv2.rectangle(img, (x1 + radius, y1), (x2 - radius, y2), color, -1)
+        cv2.rectangle(img, (x1, y1 + radius), (x2, y2 - radius), color, -1)
+    else:
+        cv2.line(img, (x1 + radius, y1), (x2 - radius, y1), color, thickness, cv2.LINE_AA)
+        cv2.line(img, (x1 + radius, y2), (x2 - radius, y2), color, thickness, cv2.LINE_AA)
+        cv2.line(img, (x1, y1 + radius), (x1, y2 - radius), color, thickness, cv2.LINE_AA)
+        cv2.line(img, (x2, y1 + radius), (x2, y2 - radius), color, thickness, cv2.LINE_AA)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Result Panel
 # ──────────────────────────────────────────────────────────────────────────────
 def draw_result_panel(frame, prediction, confidence, bin_name, bin_color,
@@ -258,88 +289,81 @@ def draw_result_panel(frame, prediction, confidence, bin_name, bin_color,
     fh, fw = frame.shape[:2]
 
     card_w = x2 - x1
-    card_h = 120  # Taller to fit the note
+    card_h = 130  # Taller to fit the note with better padding
     card_x = x1
-    card_y = y2 + 12
+    card_y = y2 + 15
 
-    if card_y + card_h > fh:
-        card_y = y1 - card_h - 12
+    if card_y + card_h > fh - 40: # Avoid HUD overlap
+        card_y = y1 - card_h - 15
 
-    # Semi-transparent card background
+    # ── Modern Glassmorphic-style Panel ──
     overlay = frame.copy()
-    cv2.rectangle(overlay, (card_x, card_y),
-                  (card_x + card_w, card_y + card_h), COLOR_BG, -1)
+    draw_rounded_rect(overlay, (card_x, card_y), (card_x + card_w, card_y + card_h), (20, 20, 25), radius=12, fill=True)
     cv2.addWeighted(overlay, 0.85, frame, 0.15, 0, frame)
+    
+    # Border
+    draw_rounded_rect(frame, (card_x, card_y), (card_x + card_w, card_y + card_h), (60, 60, 65), thickness=1, radius=12)
 
-    # Colored left stripe
-    cv2.rectangle(frame, (card_x, card_y),
-                  (card_x + 5, card_y + card_h), bin_color, -1)
+    # Thick colored left accent stripe (simulated by a filled rounded rect shifted left and clipped)
+    stripe_w = 8
+    cv2.rectangle(frame, (card_x, card_y + 12), (card_x + stripe_w, card_y + card_h - 12), bin_color, -1)
 
-    # Category name + recyclable badge
-    label_x = card_x + 15
-    cv2.putText(frame, prediction.upper(),
-                (label_x, card_y + 24),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.65, bin_color, 2)
+    # Category name
+    label_x = card_x + 20
+    draw_text_with_shadow(frame, prediction.upper(), (label_x, card_y + 30), cv2.FONT_HERSHEY_DUPLEX, 0.75, bin_color, 2)
 
     if recyclable:
-        # Recyclable badge next to the name
+        # Pilled Recyclable badge
         label_text = prediction.upper()
-        (tw, _), _ = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX,
-                                      0.65, 2)
-        badge_x = label_x + tw + 10
+        (tw, _), _ = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_DUPLEX, 0.75, 2)
+        badge_x = label_x + tw + 15
         badge_text = "RECYCLABLE"
-        (bw, bh), _ = cv2.getTextSize(badge_text, cv2.FONT_HERSHEY_SIMPLEX,
-                                       0.35, 1)
-        # Badge background
-        cv2.rectangle(frame, (badge_x - 3, card_y + 10),
-                      (badge_x + bw + 5, card_y + 10 + bh + 6),
-                      COLOR_RECYCLE, -1)
-        cv2.putText(frame, badge_text,
-                    (badge_x, card_y + 10 + bh + 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 0), 1)
+        (bw, bh), _ = cv2.getTextSize(badge_text, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)
+        
+        draw_rounded_rect(frame, (badge_x - 6, card_y + 14), (badge_x + bw + 6, card_y + 14 + bh + 8), COLOR_RECYCLE, radius=8, fill=True)
+        cv2.putText(frame, badge_text, (badge_x, card_y + 14 + bh + 4), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 30, 0), 1, cv2.LINE_AA)
 
-    # Confidence bar
+    # Custom segmented confidence bar
     bar_x = label_x
-    bar_y_pos = card_y + 38
-    bar_w = card_w - 80
-    bar_h = 12
-    cv2.rectangle(frame, (bar_x, bar_y_pos),
-                  (bar_x + bar_w, bar_y_pos + bar_h), (60, 60, 60), -1)
+    bar_y_pos = card_y + 45
+    bar_w = card_w - 90
+    bar_h = 8
+    
+    # Track
+    draw_rounded_rect(frame, (bar_x, bar_y_pos), (bar_x + bar_w, bar_y_pos + bar_h), (50, 50, 50), radius=4, fill=True)
+    # Fill
     filled = int(bar_w * confidence)
-    cv2.rectangle(frame, (bar_x, bar_y_pos),
-                  (bar_x + filled, bar_y_pos + bar_h), bin_color, -1)
-    cv2.putText(frame, f"{confidence * 100:.0f}%",
-                (bar_x + bar_w + 8, bar_y_pos + 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.4, COLOR_TEXT, 1)
+    if filled > 8: # Avoid drawing weird artifacts if confidence is super low
+        draw_rounded_rect(frame, (bar_x, bar_y_pos), (bar_x + filled, bar_y_pos + bar_h), bin_color, radius=4, fill=True)
+        
+    draw_text_with_shadow(frame, f"{confidence * 100:.1f}%", (bar_x + bar_w + 12, bar_y_pos + 9), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (240,240,240), 1)
 
-    # Bin recommendation
-    cv2.putText(frame, f"Bin: {bin_name}",
-                (label_x, card_y + 70),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR_TEXT, 1)
+    # Bin recommendation (Bold)
+    draw_text_with_shadow(frame, f"Drop in:", (label_x, card_y + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR_DIM, 1)
+    (drop_w, _), _ = cv2.getTextSize("Drop in: ", cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+    draw_text_with_shadow(frame, bin_name, (label_x + drop_w, card_y + 80), cv2.FONT_HERSHEY_DUPLEX, 0.55, COLOR_TEXT, 1)
 
     # Disposal / recycling note
-    # Wrap long notes to fit the card
-    max_chars = card_w // 8  # Approximate chars that fit
+    max_chars = card_w // 7  # Approximate chars that fit
     if len(note) > max_chars:
-        note_line1 = note[:max_chars]
-        # Try to break at a space
-        last_space = note_line1.rfind(' ')
-        if last_space > 0:
-            note_line1 = note[:last_space]
-            note_line2 = note[last_space + 1:]
-        else:
-            note_line2 = note[max_chars:]
-
-        cv2.putText(frame, note_line1,
-                    (label_x, card_y + 90),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.37, COLOR_DIM, 1)
-        cv2.putText(frame, note_line2[:max_chars],
-                    (label_x, card_y + 108),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.37, COLOR_DIM, 1)
+        # Smart text wrapping
+        words = note.split(' ')
+        lines = []
+        current_line = []
+        for word in words:
+            if len(' '.join(current_line + [word])) <= max_chars:
+                current_line.append(word)
+            else:
+                lines.append(' '.join(current_line))
+                current_line = [word]
+        if current_line:
+            lines.append(' '.join(current_line))
+            
+        y_offset = card_y + 105
+        for i, line in enumerate(lines[:2]): # Max 2 lines
+            draw_text_with_shadow(frame, line, (label_x, y_offset + (i * 16)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1)
     else:
-        cv2.putText(frame, note,
-                    (label_x, card_y + 90),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.37, COLOR_DIM, 1)
+        draw_text_with_shadow(frame, note, (label_x, card_y + 105), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -348,31 +372,51 @@ def draw_result_panel(frame, prediction, confidence, bin_name, bin_color,
 def draw_hud(frame, fps, paused):
     h, w = frame.shape[:2]
 
-    # Top bar
+    # Top floating bar
     overlay = frame.copy()
-    cv2.rectangle(overlay, (0, 0), (w, 40), COLOR_BG, -1)
+    draw_rounded_rect(overlay, (w//2 - 200, 15), (w//2 + 200, 60), (15, 15, 20), radius=15, fill=True)
     cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
-    cv2.putText(frame, "Smart Dustbin Classifier",
-                (15, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, COLOR_ACCENT, 2)
-    cv2.putText(frame, f"FPS: {fps:.1f}",
-                (w - 110, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR_TEXT, 1)
+    draw_rounded_rect(frame, (w//2 - 200, 15), (w//2 + 200, 60), (50, 50, 60), thickness=1, radius=15)
+    
+    # Title
+    title = "SMART DUSTBIN VISION"
+    (tw, _), _ = cv2.getTextSize(title, cv2.FONT_HERSHEY_DUPLEX, 0.65, 2)
+    draw_text_with_shadow(frame, title, (w//2 - tw//2, 43), cv2.FONT_HERSHEY_DUPLEX, 0.65, COLOR_ACCENT, 2, shadow_offset=(1,1))
 
-    # Bottom bar
+    # FPS pill (top right)
+    fps_text = f"FPS: {fps:.0f}"
+    (fw, _), _ = cv2.getTextSize(fps_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+    
     overlay2 = frame.copy()
-    cv2.rectangle(overlay2, (0, h - 35), (w, h), COLOR_BG, -1)
-    cv2.addWeighted(overlay2, 0.6, frame, 0.4, 0, frame)
-    cv2.putText(frame, "Q: Quit | S: Screenshot | SPACE: Pause",
-                (15, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.4, COLOR_DIM, 1)
+    draw_rounded_rect(overlay2, (w - fw - 40, 20), (w - 15, 50), (20, 20, 25), radius=10, fill=True)
+    cv2.addWeighted(overlay2, 0.8, frame, 0.2, 0, frame)
+    draw_rounded_rect(frame, (w - fw - 40, 20), (w - 15, 50), (60, 60, 60), thickness=1, radius=10)
+    
+    color_fps = (50, 255, 50) if fps > 15 else (0, 150, 255) if fps > 5 else (0, 0, 255)
+    draw_text_with_shadow(frame, fps_text, (w - fw - 28, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color_fps, 1)
 
-    # Paused overlay
+    # Bottom control bar
+    overlay3 = frame.copy()
+    cv2.rectangle(overlay3, (0, h - 45), (w, h), (10, 10, 12), -1)
+    cv2.addWeighted(overlay3, 0.85, frame, 0.15, 0, frame)
+    
+    # Separator line
+    cv2.line(frame, (0, h - 45), (w, h - 45), COLOR_ACCENT, 1)
+
+    controls = "Q / ESC to Quit   |   SPACE to Pause   |   S to Save Screenshot"
+    (cw, _), _ = cv2.getTextSize(controls, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+    draw_text_with_shadow(frame, controls, (w//2 - cw//2, h - 18), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
+
+    # Paused grand overlay
     if paused:
-        overlay3 = frame.copy()
-        cv2.rectangle(overlay3, (w // 2 - 80, h // 2 - 25),
-                      (w // 2 + 80, h // 2 + 25), COLOR_BG, -1)
-        cv2.addWeighted(overlay3, 0.8, frame, 0.2, 0, frame)
-        cv2.putText(frame, "PAUSED",
-                    (w // 2 - 55, h // 2 + 10), cv2.FONT_HERSHEY_SIMPLEX,
-                    1.0, (0, 0, 255), 2)
+        overlay4 = frame.copy()
+        cv2.rectangle(overlay4, (0, 0), (w, h), (0, 0, 0), -1)
+        cv2.addWeighted(overlay4, 0.6, frame, 0.4, 0, frame)
+        
+        draw_rounded_rect(frame, (w // 2 - 120, h // 2 - 40), (w // 2 + 120, h // 2 + 30), (20, 20, 25), radius=15, fill=True)
+        draw_rounded_rect(frame, (w // 2 - 120, h // 2 - 40), (w // 2 + 120, h // 2 + 30), (80, 80, 80), thickness=2, radius=15)
+        
+        draw_text_with_shadow(frame, "PAUSED", (w // 2 - 80, h // 2 + 10), cv2.FONT_HERSHEY_DUPLEX, 1.2, (200, 200, 250), 2, shadow_offset=(2,2))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -385,15 +429,41 @@ def main():
 
     model = load_model()
 
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        cap = cv2.VideoCapture(1)
-    if not cap.isOpened():
+    # ── Open camera (macOS-compatible) ──────────────────────────────────
+    cap = None
+    # Try different backends — AVFoundation works best on macOS
+    backends = [
+        (cv2.CAP_AVFOUNDATION, "AVFoundation"),
+        (cv2.CAP_ANY, "Default"),
+    ] if sys.platform == "darwin" else [
+        (cv2.CAP_ANY, "Default"),
+    ]
+
+    for backend, name in backends:
+        for cam_id in (0, 1):
+            print(f"🔍  Trying camera {cam_id} with {name} backend...")
+            cap = cv2.VideoCapture(cam_id, backend)
+            if cap.isOpened():
+                print(f"✅  Opened camera {cam_id} ({name})")
+                break
+            cap.release()
+            cap = None
+        if cap is not None and cap.isOpened():
+            break
+
+    if cap is None or not cap.isOpened():
         print("❌  Could not open webcam.")
         sys.exit(1)
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+    # ── Warm-up: discard initial black frames (macOS camera needs time) ──
+    print("⏳  Warming up camera (discarding initial frames)...")
+    for i in range(30):
+        cap.read()
+    time.sleep(0.5)  # Let auto-exposure settle
+    print("✅  Camera ready!")
 
     actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
