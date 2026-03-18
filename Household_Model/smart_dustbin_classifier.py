@@ -79,16 +79,17 @@ def setup_gpu():
 BASE_DIR        = os.path.dirname(os.path.abspath(__file__))
 TRAIN_DIR       = os.path.join(BASE_DIR, "household_wastes", "wastes", "train")
 TEST_DIR        = os.path.join(BASE_DIR, "household_wastes", "wastes", "test")
-MODEL_SAVE_PATH = os.path.join(BASE_DIR, "smart_dustbin_model.keras")
+MODEL_SAVE_PATH_BEST = os.path.join(BASE_DIR, "smart_dustbin_model_best.keras")
+MODEL_SAVE_PATH_LAST = os.path.join(BASE_DIR, "smart_dustbin_model_last.keras")
 PLOTS_DIR       = os.path.join(BASE_DIR, "plots")
 
 IMG_SIZE         = (240, 240)
 BATCH_SIZE       = 32
-EPOCHS_FROZEN    = 20
-EPOCHS_FINE_TUNE = 25
+EPOCHS_FROZEN    = 15      # Reduced frozen epochs since head converges quickly
+EPOCHS_FINE_TUNE = 30      # Increased fine-tuning epochs for better adaptation
 FINE_TUNE_LAYERS = 80
-LEARNING_RATE    = 1e-3
-FINE_TUNE_LR     = 1e-5
+LEARNING_RATE    = 1e-3    # Best starting LR for Adam when training new head
+FINE_TUNE_LR     = 1e-4    # Slightly higher fine-tune LR, CosineDecay will handle the rest
 VALIDATION_SPLIT = 0.2
 SHUFFLE_BUFFER   = 500
 PREFETCH_BUFFER  = 4
@@ -275,9 +276,15 @@ def get_callbacks_phase1():
             verbose=1,
         ),
         ModelCheckpoint(
-            MODEL_SAVE_PATH,
+            MODEL_SAVE_PATH_BEST,
             monitor="val_accuracy",
             save_best_only=True,
+            verbose=1,
+        ),
+        ModelCheckpoint(
+            MODEL_SAVE_PATH_LAST,
+            monitor="val_accuracy",
+            save_best_only=False,
             verbose=1,
         ),
     ]
@@ -298,9 +305,15 @@ def get_callbacks_phase2():
             verbose=1,
         ),
         ModelCheckpoint(
-            MODEL_SAVE_PATH,
+            MODEL_SAVE_PATH_BEST,
             monitor="val_accuracy",
             save_best_only=True,
+            verbose=1,
+        ),
+        ModelCheckpoint(
+            MODEL_SAVE_PATH_LAST,
+            monitor="val_accuracy",
+            save_best_only=False,
             verbose=1,
         ),
     ]
@@ -577,9 +590,13 @@ def main():
     # Step 6 — Sample predictions
     plot_sample_predictions(model, test_ds_raw)
 
-    # Step 7 — Save final model
-    model.save(MODEL_SAVE_PATH)
-    print(f"\n💾  Model saved to: {MODEL_SAVE_PATH}")
+    # Step 7 — Save final model (Last model)
+    model.save(MODEL_SAVE_PATH_LAST)
+    
+    # Reload the BEST model before final evaluation / inference if desired
+    # (Though restore_best_weights=True in EarlyStopping already ensures `model` has the best weights!)
+    print(f"\n💾  Best model saved to: {MODEL_SAVE_PATH_BEST}")
+    print(f"💾  Last model saved to: {MODEL_SAVE_PATH_LAST}")
 
     # Uncomment to run inference on a single image:
     # predict_single_image(model, "/path/to/image.jpg", class_names)
