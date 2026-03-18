@@ -1,0 +1,6 @@
+Industrial_Model/
+  dataset/
+    Recyclable/
+    Organic/
+    Non-Recyclable/
+    Hazardous/
